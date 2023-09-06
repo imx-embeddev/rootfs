@@ -1,10 +1,12 @@
 export PATH="/bin:/sbin:/usr/bin:/usr/sbin"
 
+export HOSTNAME=imx
+export root=root
 if [ "$PS1" ]; then
 	if [ "`id -u`" -eq 0 ]; then
-		export PS1='# '
+		export PS1='[\e[36;1m$root@$HOSTNAME\e[0m: \e[34;1m\w\e[0m\]\# '
 	else
-		export PS1='$ '
+		export PS1='[\e[36;1m$root@$HOSTNAME\e[0m: \e[34;1m\w\e[0m\]\$'
 	fi
 fi
 
