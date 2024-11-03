@@ -107,7 +107,7 @@ DEFCONFIGS_DIR_PATH=arch/arm/configs
 CONFIGS_DIR_PATH=${LINUX_KERNEL_DIR_PATH}
 IMAGE_DIR_PATH=image
 
-TARGET_FILE[0]=${ZIMAGE_DIR_PATH}/zImage                # linux内核镜像
+TARGET_FILE[0]=${BOOT_DIR_PATH}/zImage                # linux内核镜像
 TARGET_FILE[1]=${DTB_DIR_PATH}/imx6ull-14x14-evk.dtb    # 设备树文件
 
 ARCH_NAME=arm
@@ -125,7 +125,7 @@ function record_kernel_update()
     echo -e ${PINK}"CONFIGS_DIR_PATH      :${CONFIGS_DIR_PATH}"${CLS}
 
     # vscode 工作区配置文件
-    cp -pvf ${LINUX_KERNEL_DIR_PATH}/linux-imx.code-workspace ${RECORD_KERNEL_DIR_PATH}
+    #cp -pvf ${LINUX_KERNEL_DIR_PATH}/linux-imx.code-workspace ${RECORD_KERNEL_DIR_PATH}
 
     # 默认配置文件
     # if [ ! -d "${RECORD_KERNEL_DIR_PATH}/arch/arm/configs" ];then
@@ -139,7 +139,7 @@ function record_kernel_update()
     fi
     cp -pvf ${LINUX_KERNEL_DIR_PATH}/arch/arm/boot/dts/imx6ull-alpha-emmc.dts ${RECORD_KERNEL_DIR_PATH}/arch/arm/boot/dts
     cp -pvf ${LINUX_KERNEL_DIR_PATH}/arch/arm/boot/dts/imx6ull-alpha-emmc.dtsi ${RECORD_KERNEL_DIR_PATH}/arch/arm/boot/dts
-    cp -pvf ${LINUX_KERNEL_DIR_PATH}/arch/arm/boot/dts/Makefile ${RECORD_KERNEL_DIR_PATH}/arch/arm/boot/dts
+    #cp -pvf ${LINUX_KERNEL_DIR_PATH}/arch/arm/boot/dts/Makefile ${RECORD_KERNEL_DIR_PATH}/arch/arm/boot/dts
 }
 
 function time_count_down
@@ -165,8 +165,9 @@ function build_project()
     echo -e ${PINK}"current path:$(pwd)"${CLS}
 
     # 每次编译时间太长，不会清理后编译
-    echo -e "${INFO}正在配置编译选项(BOARD_CONFIG_NAME=${BOARD_CONFIG_NAME})..."
-    make ARCH=${ARCH_NAME} CROSS_COMPILE=${CROSS_COMPILE_NAME} ${BOARD_CONFIG_NAME}
+    # 默认配置文件只需要首次执行，后续执行会覆盖掉后来修改的配置，除非每次都更新默认配置文件
+    #echo -e "${INFO}正在配置编译选项(BOARD_CONFIG_NAME=${BOARD_CONFIG_NAME})..."
+    #make ARCH=${ARCH_NAME} CROSS_COMPILE=${CROSS_COMPILE_NAME} ${BOARD_CONFIG_NAME}
     echo -e "${INFO}正在编译工程(BOARD_CONFIG_NAME=${BOARD_CONFIG_NAME})..."
     make V=0 ARCH=${ARCH_NAME} CROSS_COMPILE=${CROSS_COMPILE_NAME} -j16
 
@@ -200,9 +201,11 @@ function build_NXP_linux()
 function build_ALPHA_linux()
 {
     #make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- distclean
-    #make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- mx6ull_alpha_emmc_defconfig # sd卡启动用这个
+    #make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- imx_alpha_emmc_defconfig # sd卡启动用这个
     #make V=0 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -j16
-    BOARD_CONFIG_NAME=mx6ull_alpha_emmc_defconfig
+    BOARD_CONFIG_NAME=imx_alpha_emmc_defconfig
+    TARGET_FILE[1]=${DTB_DIR_PATH}/imx6ull-alpha-emmc.dtb    # 设备树文件
+
     build_project
 }
 
