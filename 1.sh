@@ -99,9 +99,12 @@ function dev_env_info()
 #===============================================
 
 LINUX_KERNEL_DIR_PATH=~/7Linux/imx6ull-kernel
-ZIMAGE_DIR_PATH=arch/arm/boot
+RECORD_KERNEL_DIR_PATH=${SCRIPT_ABSOLUTE_PATH}/alpha_linux_kernel
+
+BOOT_DIR_PATH=arch/arm/boot
 DTB_DIR_PATH=arch/arm/boot/dts
-CONFIGS_DIR_PATH=arch/arm/configs
+DEFCONFIGS_DIR_PATH=arch/arm/configs
+CONFIGS_DIR_PATH=${LINUX_KERNEL_DIR_PATH}
 IMAGE_DIR_PATH=image
 
 TARGET_FILE[0]=${ZIMAGE_DIR_PATH}/zImage                # linux内核镜像
@@ -111,6 +114,20 @@ ARCH_NAME=arm
 CROSS_COMPILE_NAME=arm-linux-gnueabihf-
 BOARD_CONFIG_NAME=imx_v6_v7_defconfig
 
+function record_kernel_update()
+{
+    echo -e ${PINK}"LINUX_KERNEL_DIR_PATH :${LINUX_KERNEL_DIR_PATH}"${CLS}
+    echo -e ${PINK}"RECORD_KERNEL_DIR_PATH:${RECORD_KERNEL_DIR_PATH}"${CLS}
+    echo -e ${PINK}"IMAGE_DIR_PATH        :${IMAGE_DIR_PATH}"${CLS}
+    echo -e ${PINK}"DTB_DIR_PATH          :${DTB_DIR_PATH}"${CLS}
+    echo -e ${PINK}"BOOT_DIR_PATH         :${BOOT_DIR_PATH}"${CLS}
+    echo -e ${PINK}"DEFCONFIGS_DIR_PATH   :${DEFCONFIGS_DIR_PATH}"${CLS}
+    echo -e ${PINK}"CONFIGS_DIR_PATH      :${CONFIGS_DIR_PATH}"${CLS}
+
+    # vscode 工作区配置文件
+    cp -pvf ${LINUX_KERNEL_DIR_PATH}/linux-imx.code-workspace ${RECORD_KERNEL_DIR_PATH}
+
+}
 
 function time_count_down
 {
@@ -144,14 +161,10 @@ function build_project()
     for temp in ${TARGET_FILE[@]}
     do
         if [ ! -f "${TARGET_FILE}" ];then
-            echo -e "${RED}++++++++++++++++++++++++++++++++++++++++++++++++++++${CLS}"
             echo -e "${ERR}${temp} 编译失败,请检查后重试"
-            echo -e "${RED}++++++++++++++++++++++++++++++++++++++++++++++++++++${CLS}"
             continue
         else
-            echo -e "${GREEN}++++++++++++++++++++++++++++++++++++++++++++++++++++${CLS}"
             echo -e "${INFO}${temp} 编译成功"
-            echo -e "${GREEN}++++++++++++++++++++++++++++++++++++++++++++++++++++${CLS}"
         fi
         if [ ! -d "${IMAGE_DIR_PATH}" ];then
             mkdir -p ${IMAGE_DIR_PATH}
@@ -195,6 +208,7 @@ function echo_menu()
     echo -e "* [0] 编译linux内核"
     echo -e "* [1] 清理linux内核工程"
     echo -e "* [2] 编译NXP官方原版linux内核"
+    echo -e "* [3] 记录内核修改的文件"
     echo "================================================="
 }
 
@@ -205,6 +219,7 @@ function func_process()
 		"0") build_ALPHA_linux;;
 		"1") clean_project;;
 		"2") build_NXP_linux;;
+		"3") record_kernel_update;;
 		*) build_ALPHA_linux;;
 	esac
 }
