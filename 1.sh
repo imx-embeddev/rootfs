@@ -125,7 +125,13 @@ function record_kernel_update()
     echo -e ${PINK}"CONFIGS_DIR_PATH      :${CONFIGS_DIR_PATH}"${CLS}
 
     # vscode 工作区配置文件
-    cp -pvf ${LINUX_KERNEL_DIR_PATH}/linux-imx.code-workspace ${RECORD_KERNEL_DIR_PATH}
+    #cp -pvf ${LINUX_KERNEL_DIR_PATH}/linux-imx.code-workspace ${RECORD_KERNEL_DIR_PATH}
+
+    # 默认配置文件
+    if [ ! -d "${RECORD_KERNEL_DIR_PATH}/arch/arm/configs" ];then
+        mkdir -p ${RECORD_KERNEL_DIR_PATH}/arch/arm/configs
+    fi
+    cp -pvf ${LINUX_KERNEL_DIR_PATH}/arch/arm/configs/imx_alpha_emmc_defconfig ${RECORD_KERNEL_DIR_PATH}/arch/arm/configs
 
 }
 
