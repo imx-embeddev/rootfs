@@ -1,9 +1,9 @@
 #!/bin/bash
 # * =====================================================
 # * Copyright © hk. 2022-2025. All rights reserved.
-# * File name  : 1.sh
+# * File name  : build.sh
 # * Author     : 苏木
-# * Date       : 2024-11-01
+# * Date       : 2024-11-03
 # * ======================================================
 ##
 
@@ -30,10 +30,9 @@ SYSTEM_ENVIRONMENT_FILE=/etc/profile # 系统环境变量位置
 USER_ENVIRONMENT_FILE=~/.bashrc
 SOFTWARE_DIR_PATH=~/2software        # 软件安装目录
 
+#===============================================
 TIME_START=
 TIME_END=
-
-#===============================================
 function get_start_time()
 {
 	TIME_START=$(date +'%Y-%m-%d %H:%M:%S')
@@ -83,38 +82,98 @@ function get_ubuntu_info()
     echo "swap  : $ubuntu_swap_total"
     echo "cpu   : $ubuntu_cpu,physical id is$ubuntu_physical_id,cores is $ubuntu_cpu_cores,processor is $ubuntu_processor"
 }
-#===============================================
+
 # 开发环境信息
 function dev_env_info()
 {
     echo "Development environment: "
-    echo "ubuntu : 20.04.2-64(1核12线程 16GB RAM,512GB SSD)"
+    echo "ubuntu : 20.04.2-64(1核12线程 16GB RAM,512GB SSD) arm"
     echo "VMware : VMware® Workstation 17 Pro 17.6.0 build-24238078"
     echo "Windows: "
     echo "          处理器 AMD Ryzen 7 5800H with Radeon Graphics 3.20 GHz 8核16线程"
     echo "          RAM	32.0 GB (31.9 GB 可用)"
     echo "          系统类型	64 位操作系统, 基于 x64 的处理器"
-    echo "说明: 初次安装完SDK,在以上环境下编译大约需要3小时,不加任何修改进行编译大约需要10~15分钟左右"
+    echo "linux开发板原始系统组件版本:"
+    echo "          uboot : v2019.04 https://github.com/nxp-imx/uboot-imx/releases/tag/rel_imx_4.19.35_1.1.0"
+    echo "          kernel: v4.19.71 https://github.com/nxp-imx/linux-imx/releases/tag/v4.19.71"
+    echo "          rootfs: buildroot-2023.05.1 https://buildroot.org/downloads/buildroot-2023.05.1.tar.gz"
+    echo ""
+    echo "x86_64-linux-gnu   : gcc version 9.4.0 (Ubuntu 9.4.0-1ubuntu1~20.04.2)"
+    echo "arm-linux-gnueabihf:"
+    echo "          arm-linux-gnueabihf-gcc 8.3.0"
+    echo "          https://developer.arm.com/-/media/Files/downloads/gnu-a/8.3-2019.03/binrel/gcc-arm-8.3-2019.03-x86_64-arm-linux-gnueabihf.tar.xz"
 }
 #===============================================
-
-LINUX_KERNEL_DIR_PATH=~/7Linux/imx6ull-kernel
-RECORD_KERNEL_DIR_PATH=${SCRIPT_ABSOLUTE_PATH}/alpha_linux_kernel
-
-BOOT_DIR_PATH=arch/arm/boot
-DTB_DIR_PATH=arch/arm/boot/dts
-DEFCONFIGS_DIR_PATH=arch/arm/configs
-CONFIGS_DIR_PATH=${LINUX_KERNEL_DIR_PATH}
-IMAGE_DIR_PATH=image
-
-TARGET_FILE[0]=${BOOT_DIR_PATH}/zImage                # linux内核镜像
-TARGET_FILE[1]=${DTB_DIR_PATH}/imx6ull-14x14-evk.dtb    # 设备树文件
-
+# 编译工具
 ARCH_NAME=arm
 CROSS_COMPILE_NAME=arm-linux-gnueabihf-
-BOARD_CONFIG_NAME=imx_v6_v7_defconfig
+DEF_CONFIG_TYPE=alpha # nxp 表示编译nxp官方原版配置文件，alpha表示编译我们自定义的配置文件
+# 固定参数定义
+imx6ull_release_path=~/7Linux/imx6ull-alpha-release/release
+imx6ull_release_img=()
 
-function record_kernel_update()
+# linux kernel相关
+linux_project_path=~/7Linux/imx6ull-kernel
+linux_file_backup_path=~/7Linux/imx6ull-alpha-release/alpha_linux_kernel
+
+linux_boot_path=arch/arm/boot
+linux_dtb_path=arch/arm/boot/dts
+linux_board_cfg_path=arch/arm/configs
+linux_image_path=image
+linux_img_name=zImage
+
+# uboot相关目录
+uboot_project_path=~/7Linux/imx6ull-uboot
+uboot_img_name=(u-boot-dtb.bin u-boot-dtb.imx)
+
+# buildroot相关
+buildroot_project_path=~/7Linux/buildroot-2023.05.1
+buildroot_out_path=output/images
+buildroot_rootfs_name=rootfs.tar
+
+
+# 脚本运行参数处理
+echo "There are $# parameters: $@"
+while getopts "t:" arg #选项后面的冒号表示该选项需要参数
+    do
+        case ${arg} in
+            t)
+                echo "a's arg:$OPTARG" #参数存在$OPTARG中
+                if [ $OPTARG == "0" ];then # 使用NXP官方的默认配置文件
+                    DEF_CONFIG_TYPE=nxp
+                fi
+                ;;
+            ?)  #当有不认识的选项的时候arg为?
+                echo "${ERR}unkonw argument..."
+                exit 1
+                ;;
+        esac
+    done
+
+# 可变参数定义
+if [ ${DEF_CONFIG_TYPE} == "nxp" ];then
+linux_dtb_name=imx6ull-14x14-evk.dtb
+linux_board_cfg=imx_v6_v7_defconfig
+else
+linux_dtb_name=imx6ull-alpha-emmc.dtb
+linux_board_cfg=imx_alpha_emmc_defconfig
+fi
+linux_target=(${linux_boot_path}/${linux_img_name}
+              ${linux_dtb_path}/${linux_dtb_name})
+
+imx6ull_release_img[0]=${linux_project_path}/${linux_target[0]}
+imx6ull_release_img[1]=${linux_project_path}/${linux_target[1]}
+imx6ull_release_img[2]=${uboot_project_path}/${uboot_img_name[0]}
+imx6ull_release_img[3]=${uboot_project_path}/${uboot_img_name[1]}
+
+
+function clean_project()
+{
+    #make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- distclean
+    make ARCH=${ARCH_NAME} CROSS_COMPILE=${CROSS_COMPILE_NAME} distclean
+}
+
+function record_kernel_file_update()
 {
     echo -e ${PINK}"LINUX_KERNEL_DIR_PATH :${LINUX_KERNEL_DIR_PATH}"${CLS}
     echo -e ${PINK}"RECORD_KERNEL_DIR_PATH:${RECORD_KERNEL_DIR_PATH}"${CLS}
@@ -125,90 +184,94 @@ function record_kernel_update()
     echo -e ${PINK}"CONFIGS_DIR_PATH      :${CONFIGS_DIR_PATH}"${CLS}
 
     # vscode 工作区配置文件
-    #cp -pvf ${LINUX_KERNEL_DIR_PATH}/linux-imx.code-workspace ${RECORD_KERNEL_DIR_PATH}
+    #cp -pvf ${linux_project_path}/linux-imx.code-workspace ${linux_file_backup_path}
 
     # 默认配置文件
-    # if [ ! -d "${RECORD_KERNEL_DIR_PATH}/arch/arm/configs" ];then
-    #     mkdir -p ${RECORD_KERNEL_DIR_PATH}/arch/arm/configs
+    # if [ ! -d "${linux_file_backup_path}/arch/arm/configs" ];then
+    #     mkdir -p ${linux_file_backup_path}/arch/arm/configs
     # fi
-    # cp -pvf ${LINUX_KERNEL_DIR_PATH}/arch/arm/configs/imx_alpha_emmc_defconfig ${RECORD_KERNEL_DIR_PATH}/arch/arm/configs
+    # cp -pvf ${linux_project_path}/arch/arm/configs/imx_alpha_emmc_defconfig ${linux_file_backup_path}/arch/arm/configs
 
     # 设备树相关文件
-    if [ ! -d "${RECORD_KERNEL_DIR_PATH}/arch/arm/boot/dts" ];then
-        mkdir -p ${RECORD_KERNEL_DIR_PATH}/arch/arm/boot/dts
+    if [ ! -d "${linux_project_path}/arch/arm/boot/dts" ];then
+        mkdir -p ${linux_project_path}/arch/arm/boot/dts
     fi
-    cp -pvf ${LINUX_KERNEL_DIR_PATH}/arch/arm/boot/dts/imx6ull-alpha-emmc.dts ${RECORD_KERNEL_DIR_PATH}/arch/arm/boot/dts
-    cp -pvf ${LINUX_KERNEL_DIR_PATH}/arch/arm/boot/dts/imx6ull-alpha-emmc.dtsi ${RECORD_KERNEL_DIR_PATH}/arch/arm/boot/dts
-    #cp -pvf ${LINUX_KERNEL_DIR_PATH}/arch/arm/boot/dts/Makefile ${RECORD_KERNEL_DIR_PATH}/arch/arm/boot/dts
+    cp -pvf ${linux_project_path}/arch/arm/boot/dts/imx6ull-alpha-emmc.dts ${linux_file_backup_path}/arch/arm/boot/dts
+    cp -pvf ${linux_project_path}/arch/arm/boot/dts/imx6ull-alpha-emmc.dtsi ${linux_file_backup_path}/arch/arm/boot/dts
+    #cp -pvf ${linux_project_path}/arch/arm/boot/dts/Makefile ${linux_file_backup_path}/arch/arm/boot/dts
 }
 
-function time_count_down
-{
-    for i in {3..1}
-    do     
-
-        echo -ne "${INFO}after ${i} is end!!"
-        echo -ne "\r\r"        # echo -e 处理特殊字符  \r 光标移至行首，但不换行
-        sleep 1
-    done
-    echo "" # 打印一个空行，防止出现混乱
-}
-function clean_project()
-{
-    make ARCH=${ARCH_NAME} CROSS_COMPILE=${CROSS_COMPILE_NAME} distclean
-}
-
-function build_project()
+function build_linux_project()
 {
     get_start_time
-    cd ${LINUX_KERNEL_DIR_PATH}
-    echo -e ${PINK}"current path:$(pwd)"${CLS}
+    # $0是脚本的名称，若是给函数传参，$1 表示跟在函数名后的第一个参数
+    echo "build_linux_project有 $# 个参数:$@"
+    cd ${linux_project_path}
 
+    echo -e ${PINK}"current path:$(pwd)"${CLS}
+    local board_defconfig_name=$1
+    
     # 每次编译时间太长，不会清理后编译
     # 默认配置文件只需要首次执行，后续执行会覆盖掉后来修改的配置，除非每次都更新默认配置文件
-    #echo -e "${INFO}正在配置编译选项(BOARD_CONFIG_NAME=${BOARD_CONFIG_NAME})..."
-    #make ARCH=${ARCH_NAME} CROSS_COMPILE=${CROSS_COMPILE_NAME} ${BOARD_CONFIG_NAME}
-    echo -e "${INFO}正在编译工程(BOARD_CONFIG_NAME=${BOARD_CONFIG_NAME})..."
+    echo -e "${INFO}正在配置编译选项(board_defconfig_name=${board_defconfig_name})..."
+    # make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- imx_alpha_emmc_defconfig
+    make ARCH=${ARCH_NAME} CROSS_COMPILE=${CROSS_COMPILE_NAME} ${board_defconfig_name}
+
+    echo -e "${INFO}正在编译工程(board_defconfig_name=${board_defconfig_name})..."
+    # make V=0 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -j16
     make V=0 ARCH=${ARCH_NAME} CROSS_COMPILE=${CROSS_COMPILE_NAME} -j16
 
-    echo -e "${INFO}检查是否编译成功..."
-    for temp in ${TARGET_FILE[@]}
+    for temp in ${linux_target[@]}
     do
-        if [ ! -f "${TARGET_FILE}" ];then
+        if [ ! -f "${linux_target}" ];then
             echo -e "${ERR}${temp} 编译失败,请检查后重试"
             continue
         else
-            echo -e "${INFO}${temp} 编译成功"
+            echo -e "${INFO}${temp} 编译成功."
         fi
-        if [ ! -d "${IMAGE_DIR_PATH}" ];then
-            mkdir -p ${IMAGE_DIR_PATH}
+        if [ ! -d "${linux_image_path}" ];then
+            mkdir -p ${linux_image_path}
         fi
-        cp -pvf ${temp} ${IMAGE_DIR_PATH}
+        cp -pvf ${temp} ${linux_image_path}
+        cp -pvf ${temp} ${imx6ull_release_path} # 编译完自动拷贝一份到备份目录
     done
     get_end_time
     get_execute_time
 }
 
-function build_NXP_linux()
+function update_uboot_img()
 {
-    #make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- distclean
-    #make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- imx_v6_v7_defconfig # sd卡启动用这个
-    #make V=0 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -j16
-    BOARD_CONFIG_NAME=imx_v6_v7_defconfig
-    build_project
+    cd ${uboot_project_path}
+    echo -e ${PINK}"current path:$(pwd)"${CLS}
+
+    for temp in ${uboot_img_name[@]}
+    do
+        if [ ! -f "${temp}" ];then
+            echo -e "${ERR}${temp} 不存在..."
+            continue
+        else
+            cp -pvf ${temp} ${imx6ull_release_path} # 编译完自动拷贝一份到备份目录
+        fi
+    done
 }
 
-function build_ALPHA_linux()
+
+function update_buildroot_rootfs()
 {
-    #make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- distclean
-    #make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- imx_alpha_emmc_defconfig # sd卡启动用这个
-    #make V=0 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -j16
-    BOARD_CONFIG_NAME=imx_alpha_emmc_defconfig
-    TARGET_FILE[1]=${DTB_DIR_PATH}/imx6ull-alpha-emmc.dtb    # 设备树文件
+    cd ${buildroot_project_path}/${buildroot_out_path}
+    echo -e ${PINK}"current path:$(pwd)"${CLS}
 
-    build_project
+    if [ ! -f "${buildroot_rootfs_name}" ];then
+        echo -e "${ERR}${buildroot_rootfs_name}不存在..."
+        return
+    else
+        cp -pvf ${buildroot_rootfs_name} ${imx6ull_release_path} # 编译完自动拷贝一份到备份目录
+        cd ${imx6ull_release_path}
+        tar -jcf ${buildroot_rootfs_name}.bz2 ${buildroot_rootfs_name}
+        rm -rf ${buildroot_rootfs_name}
+    fi
+
 }
-
 function echo_menu()
 {
     echo "================================================="
@@ -219,12 +282,11 @@ function echo_menu()
     echo -e "${PINK}SCRIPT_CURRENT_PATH  :${SCRIPT_CURRENT_PATH}${CLS}"
     echo -e "${PINK}ARCH_NAME            :${ARCH_NAME}${CLS}"
     echo -e "${PINK}CROSS_COMPILE_NAME   :${CROSS_COMPILE_NAME}${CLS}"
-    echo -e "${PINK}BOARD_CONFIG_NAME    :${BOARD_CONFIG_NAME}${CLS}"
     echo ""
-    echo -e "* [0] 编译linux内核"
-    echo -e "* [1] 清理linux内核工程"
-    echo -e "* [2] 编译NXP官方原版linux内核"
-    echo -e "* [3] 记录内核修改的文件"
+    echo -e "* [0] 编译linux kernel"
+    echo -e "* [1] 同步linux内核文件的修改"
+    echo -e "* [2] 同步uboot成果物"
+    echo -e "* [3] 同步buildroot成果物"
     echo "================================================="
 }
 
@@ -232,11 +294,11 @@ function func_process()
 {
 	read -p "请选择功能,默认选择0:" choose
 	case "${choose}" in
-		"0") build_ALPHA_linux;;
-		"1") clean_project;;
-		"2") build_NXP_linux;;
-		"3") record_kernel_update;;
-		*) build_ALPHA_linux;;
+		"0") build_linux_project ${linux_board_cfg};;
+		"1") record_kernel_file_update;;
+		"2") update_uboot_img;;
+		"3") update_buildroot_rootfs;;
+		*) build_linux_project ${linux_board_cfg};;
 	esac
 }
 
