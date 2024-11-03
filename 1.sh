@@ -125,14 +125,21 @@ function record_kernel_update()
     echo -e ${PINK}"CONFIGS_DIR_PATH      :${CONFIGS_DIR_PATH}"${CLS}
 
     # vscode 工作区配置文件
-    #cp -pvf ${LINUX_KERNEL_DIR_PATH}/linux-imx.code-workspace ${RECORD_KERNEL_DIR_PATH}
+    cp -pvf ${LINUX_KERNEL_DIR_PATH}/linux-imx.code-workspace ${RECORD_KERNEL_DIR_PATH}
 
     # 默认配置文件
-    if [ ! -d "${RECORD_KERNEL_DIR_PATH}/arch/arm/configs" ];then
-        mkdir -p ${RECORD_KERNEL_DIR_PATH}/arch/arm/configs
-    fi
-    cp -pvf ${LINUX_KERNEL_DIR_PATH}/arch/arm/configs/imx_alpha_emmc_defconfig ${RECORD_KERNEL_DIR_PATH}/arch/arm/configs
+    # if [ ! -d "${RECORD_KERNEL_DIR_PATH}/arch/arm/configs" ];then
+    #     mkdir -p ${RECORD_KERNEL_DIR_PATH}/arch/arm/configs
+    # fi
+    # cp -pvf ${LINUX_KERNEL_DIR_PATH}/arch/arm/configs/imx_alpha_emmc_defconfig ${RECORD_KERNEL_DIR_PATH}/arch/arm/configs
 
+    # 设备树相关文件
+    if [ ! -d "${RECORD_KERNEL_DIR_PATH}/arch/arm/boot/dts" ];then
+        mkdir -p ${RECORD_KERNEL_DIR_PATH}/arch/arm/boot/dts
+    fi
+    cp -pvf ${LINUX_KERNEL_DIR_PATH}/arch/arm/boot/dts/imx6ull-alpha-emmc.dts ${RECORD_KERNEL_DIR_PATH}/arch/arm/boot/dts
+    cp -pvf ${LINUX_KERNEL_DIR_PATH}/arch/arm/boot/dts/imx6ull-alpha-emmc.dtsi ${RECORD_KERNEL_DIR_PATH}/arch/arm/boot/dts
+    cp -pvf ${LINUX_KERNEL_DIR_PATH}/arch/arm/boot/dts/Makefile ${RECORD_KERNEL_DIR_PATH}/arch/arm/boot/dts
 }
 
 function time_count_down
