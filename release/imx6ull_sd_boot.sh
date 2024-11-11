@@ -276,6 +276,29 @@ function sd_dowwnload_rootfs()
     echo -e ${INFO}"${dev} 分区烧写完毕。"
 }
 
+# 关闭ext4分区的journal日志功能
+# 否则挂载根文件系统会失败
+# ubuntu内核版本：5.15.0-122-generic
+# nxp 内核版本：4.19.71
+function sd_remove_ext4_journal()
+{
+    local dev=${sd_part[1]}
+    echo -e ${INFO}"要处理的是根文件系统分区 ${PINK}${dev}${CLS} ..."
+
+    # 查看分区特性
+    tune2fs -l ${dev} | grep feature
+    
+    # 卸载分区
+    umount ${dev} 2>/dev/null
+
+    # 修改分区日志
+    tune2fs -O ^has_journal ${dev}
+
+    # 确认分区特性
+    tune2fs -l ${dev} | grep feature
+    echo -e ${INFO}"${dev} 分区journal日志处理完毕。"
+}
+
 function echo_menu()
 {
     sd_get_device  # 最开始要先获取sd卡信息
@@ -294,6 +317,7 @@ function echo_menu()
     echo -e "* [4] 烧写uboot到sd卡分区0"
     echo -e "* [5] 烧写内核和设备树到sd卡分区1"
     echo -e "* [6] 烧写根文件系统到sd卡分区2"
+    echo -e "* [7] 移除ext4分区的has_journal特性"
     echo "================================================="
 }
 
@@ -305,6 +329,7 @@ function sd_boot()
     sd_dowwnload_uboot
     sd_dowwnload_kernel_dtbs
     sd_dowwnload_rootfs
+    sd_remove_ext4_journal
 }
 function func_process()
 {
@@ -317,6 +342,7 @@ function func_process()
 		"4") sd_dowwnload_uboot;;
         "5") sd_dowwnload_kernel_dtbs;;
         "6") sd_dowwnload_rootfs;;
+        "7") sd_remove_ext4_journal;;
 		*) sd_boot;;
 	esac
 }
