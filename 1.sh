@@ -201,6 +201,24 @@ function record_kernel_file_update()
     #cp -pvf ${linux_project_path}/arch/arm/boot/dts/Makefile ${linux_file_backup_path}/arch/arm/boot/dts
 }
 
+# 编译NXP官方原版镜像
+# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- clean
+# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- imx_v6_v7_defconfig
+# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- all -j16 # 全编译
+# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- zImage -j16 # 只编译内核镜像
+# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- dtbs -j16   # 只编译所有的设备树
+# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- imx6ull-14x14-evk.dtb -j16 # 只编译指定的设备树
+
+# 编译自己移植的开发板镜像
+# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- clean
+# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- imx_alpha_emmc_defconfig
+# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- all -j16 # 全编译
+# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- zImage -j16 # 只编译内核镜像
+# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- dtbs -j16   # 只编译所有的设备树
+# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- imx6ull-alpha-emmc.dtb -j16 # 只编译指定的设备树
+
+
+
 function build_linux_project()
 {
     get_start_time
@@ -218,8 +236,8 @@ function build_linux_project()
     make ARCH=${ARCH_NAME} CROSS_COMPILE=${CROSS_COMPILE_NAME} ${board_defconfig_name}
 
     echo -e "${INFO}正在编译工程(board_defconfig_name=${board_defconfig_name})..."
-    # make V=0 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -j16
-    make V=0 ARCH=${ARCH_NAME} CROSS_COMPILE=${CROSS_COMPILE_NAME} -j16
+    # make V=0 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- all -j16
+    make V=0 ARCH=${ARCH_NAME} CROSS_COMPILE=${CROSS_COMPILE_NAME} all -j16
 
     for temp in ${linux_target[@]}
     do
