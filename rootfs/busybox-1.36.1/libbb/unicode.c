@@ -1027,7 +1027,8 @@ static char* FAST_FUNC unicode_conv_to_printable2(uni_stat_t *stats, const char 
 					while ((int)--width >= 0);
 					break;
 				}
-				*d++ = (c >= ' ' && c < 0x7f) ? c : '?';
+				//*d++ = (c >= ' ' && c < 0x7f) ? c : '?';
+                *d++ = (c >= ' ') ? c : '?';
 				src++;
 			}
 			*d = '\0';
@@ -1035,7 +1036,8 @@ static char* FAST_FUNC unicode_conv_to_printable2(uni_stat_t *stats, const char 
 			d = dst = xstrndup(src, width);
 			while (*d) {
 				unsigned char c = *d;
-				if (c < ' ' || c >= 0x7f)
+				//if (c < ' ' || c >= 0x7f)
+                if (c < ' ')
 					*d = '?';
 				d++;
 			}
