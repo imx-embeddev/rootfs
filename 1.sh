@@ -83,7 +83,7 @@ function get_ubuntu_info()
     echo "cpu   : $ubuntu_cpu,physical id is$ubuntu_physical_id,cores is $ubuntu_cpu_cores,processor is $ubuntu_processor"
 }
 
-# 开发环境信息
+# 本地虚拟机VMware开发环境信息
 function dev_env_info()
 {
     echo "Development environment: "
@@ -104,41 +104,29 @@ function dev_env_info()
     echo "          https://developer.arm.com/-/media/Files/downloads/gnu-a/8.3-2019.03/binrel/gcc-arm-8.3-2019.03-x86_64-arm-linux-gnueabihf.tar.xz"
 }
 #===============================================
-# 编译工具
-ARCH_NAME=arm
-CROSS_COMPILE_NAME=arm-linux-gnueabihf-
-DEF_CONFIG_TYPE=alpha # nxp 表示编译nxp官方原版配置文件，alpha表示编译我们自定义的配置文件
-# 固定参数定义
-imx6ull_release_path=~/7Linux/imx6ull-alpha-release/release
-imx6ull_release_img=()
-
-# linux kernel相关
-linux_project_path=~/7Linux/imx6ull-kernel
-linux_file_backup_path=~/7Linux/imx6ull-alpha-release/alpha_linux_kernel
-
-linux_boot_path=arch/arm/boot
-linux_dtb_path=arch/arm/boot/dts
-linux_board_cfg_path=arch/arm/configs
-linux_image_path=image
-linux_img_name=zImage
-
-# uboot相关目录
-uboot_project_path=~/7Linux/imx6ull-uboot
-uboot_img_name=(u-boot-dtb.bin u-boot-dtb.imx)
-
 # buildroot相关
-buildroot_project_path=~/7Linux/buildroot-2023.05.1
+buildroot_version=buildroot-2023.05.1
+buildroot_project_path=./${buildroot_version}
 buildroot_out_path=output/images
 buildroot_rootfs_name=rootfs.tar
 
-
+githubaction_ena=0 # 手动选择功能
+DEF_CONFIG_TYPE=alpha # nxp 表示编译nxp官方原版配置文件，alpha表示编译我们自定义的配置文件
+buildroot_board_cfg=imx6ullalpha_defconfig
 # 脚本运行参数处理
 echo "There are $# parameters: $@"
-while getopts "t:" arg #选项后面的冒号表示该选项需要参数
+while getopts "g:t:" arg #选项后面的冒号表示该选项需要参数
     do
         case ${arg} in
+            g)
+                # echo "a's arg:$OPTARG"     # 参数存在$OPTARG中
+                if [ $OPTARG == "1" ];then # 使用NXP官方的默认配置文件
+                    githubaction_ena=1
+                    buildroot_board_cfg=imx6ullalpha_githubaction_defconfig
+                fi
+                ;;
             t)
-                echo "a's arg:$OPTARG" #参数存在$OPTARG中
+                # echo "a's arg:$OPTARG"     # 参数存在$OPTARG中
                 if [ $OPTARG == "0" ];then # 使用NXP官方的默认配置文件
                     DEF_CONFIG_TYPE=nxp
                 fi
@@ -150,129 +138,38 @@ while getopts "t:" arg #选项后面的冒号表示该选项需要参数
         esac
     done
 
-# 可变参数定义
-if [ ${DEF_CONFIG_TYPE} == "nxp" ];then
-linux_dtb_name=imx6ull-14x14-evk.dtb
-linux_board_cfg=imx_v6_v7_defconfig
-else
-linux_dtb_name=imx6ull-alpha-emmc.dtb
-linux_board_cfg=imx_alpha_emmc_defconfig
-fi
-linux_target=(${linux_boot_path}/${linux_img_name}
-              ${linux_dtb_path}/${linux_dtb_name})
-
-imx6ull_release_img[0]=${linux_project_path}/${linux_target[0]}
-imx6ull_release_img[1]=${linux_project_path}/${linux_target[1]}
-imx6ull_release_img[2]=${uboot_project_path}/${uboot_img_name[0]}
-imx6ull_release_img[3]=${uboot_project_path}/${uboot_img_name[1]}
-
-
-function clean_project()
+# Github Actions托管的linux服务器有以下用户级环境变量，系统级环境变量加上sudo好像也权限修改
+# .bash_logout  当用户注销时，此文件将被读取，通常用于清理工作，如删除临时文件。
+# .bashrc       此文件包含特定于 Bash Shell 的配置，如别名和函数。它在每次启动非登录 Shell 时被读取。
+# .profile、.bash_profile 这两个文件位于用户的主目录下，用于设置特定用户的环境变量和启动程序。当用户登录时，
+#                        根据 Shell 的类型和配置，这些文件中的一个或多个将被读取。
+USER_ENV_FILE_BASHRC=~/.bashrc
+USER_ENV_FILE_PROFILE=~/.profile
+USER_ENV_FILE_BASHRC_PROFILE=~/.bash_profile
+function source_env_info()
 {
-    #make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- distclean
-    make ARCH=${ARCH_NAME} CROSS_COMPILE=${CROSS_COMPILE_NAME} distclean
-}
-
-function record_kernel_file_update()
-{
-    echo -e ${PINK}"LINUX_KERNEL_DIR_PATH :${LINUX_KERNEL_DIR_PATH}"${CLS}
-    echo -e ${PINK}"RECORD_KERNEL_DIR_PATH:${RECORD_KERNEL_DIR_PATH}"${CLS}
-    echo -e ${PINK}"IMAGE_DIR_PATH        :${IMAGE_DIR_PATH}"${CLS}
-    echo -e ${PINK}"DTB_DIR_PATH          :${DTB_DIR_PATH}"${CLS}
-    echo -e ${PINK}"BOOT_DIR_PATH         :${BOOT_DIR_PATH}"${CLS}
-    echo -e ${PINK}"DEFCONFIGS_DIR_PATH   :${DEFCONFIGS_DIR_PATH}"${CLS}
-    echo -e ${PINK}"CONFIGS_DIR_PATH      :${CONFIGS_DIR_PATH}"${CLS}
-
-    # vscode 工作区配置文件
-    #cp -pvf ${linux_project_path}/linux-imx.code-workspace ${linux_file_backup_path}
-
-    # 默认配置文件
-    # if [ ! -d "${linux_file_backup_path}/arch/arm/configs" ];then
-    #     mkdir -p ${linux_file_backup_path}/arch/arm/configs
-    # fi
-    # cp -pvf ${linux_project_path}/arch/arm/configs/imx_alpha_emmc_defconfig ${linux_file_backup_path}/arch/arm/configs
-
-    # 设备树相关文件
-    if [ ! -d "${linux_project_path}/arch/arm/boot/dts" ];then
-        mkdir -p ${linux_project_path}/arch/arm/boot/dts
+    if [ -f ${USER_ENV_FILE_PROFILE} ]; then
+        source ${USER_ENV_FILE_BASHRC}
     fi
-    cp -pvf ${linux_project_path}/arch/arm/boot/dts/imx6ull-alpha-emmc.dts ${linux_file_backup_path}/arch/arm/boot/dts
-    cp -pvf ${linux_project_path}/arch/arm/boot/dts/imx6ull-alpha-emmc.dtsi ${linux_file_backup_path}/arch/arm/boot/dts
-    #cp -pvf ${linux_project_path}/arch/arm/boot/dts/Makefile ${linux_file_backup_path}/arch/arm/boot/dts
+    # 修改可能出现的其他用户级环境变量，防止不生效
+    if [ -f ${USER_ENV_FILE_PROFILE} ]; then
+        source ${USER_ENV_FILE_PROFILE}
+    fi
+
+    if [ -f ${USER_ENV_FILE_BASHRC_PROFILE} ]; then
+        source ${USER_ENV_FILE_BASHRC_PROFILE}
+    fi
+
 }
 
-# 编译NXP官方原版镜像
-# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- clean
-# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- imx_v6_v7_defconfig
-# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- all -j16 # 全编译
-# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- zImage -j16 # 只编译内核镜像
-# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- dtbs -j16   # 只编译所有的设备树
-# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- imx6ull-14x14-evk.dtb -j16 # 只编译指定的设备树
-
-# 编译自己移植的开发板镜像
-# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- clean
-# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- imx_alpha_emmc_defconfig
-# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- all -j16 # 全编译
-# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- zImage -j16 # 只编译内核镜像
-# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- dtbs -j16   # 只编译所有的设备树
-# make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- imx6ull-alpha-emmc.dtb -j16 # 只编译指定的设备树
-
-
-
-function build_linux_project()
+function githubaction_build_rootfs()
 {
-    get_start_time
-    # $0是脚本的名称，若是给函数传参，$1 表示跟在函数名后的第一个参数
-    echo "build_linux_project有 $# 个参数:$@"
-    cd ${linux_project_path}
-
-    echo -e ${PINK}"current path:$(pwd)"${CLS}
-    local board_defconfig_name=$1
-    
-    # 每次编译时间太长，不会清理后编译
-    # 默认配置文件只需要首次执行，后续执行会覆盖掉后来修改的配置，除非每次都更新默认配置文件
-    echo -e "${INFO}正在配置编译选项(board_defconfig_name=${board_defconfig_name})..."
-    # make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- imx_alpha_emmc_defconfig
-    make ARCH=${ARCH_NAME} CROSS_COMPILE=${CROSS_COMPILE_NAME} ${board_defconfig_name}
-
-    echo -e "${INFO}正在编译工程(board_defconfig_name=${board_defconfig_name})..."
-    # make V=0 ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- all -j16
-    make V=0 ARCH=${ARCH_NAME} CROSS_COMPILE=${CROSS_COMPILE_NAME} all -j16
-
-    for temp in ${linux_target[@]}
-    do
-        if [ ! -f "${linux_target}" ];then
-            echo -e "${ERR}${temp} 编译失败,请检查后重试"
-            continue
-        else
-            echo -e "${INFO}${temp} 编译成功."
-        fi
-        if [ ! -d "${linux_image_path}" ];then
-            mkdir -p ${linux_image_path}
-        fi
-        cp -pvf ${temp} ${linux_image_path}
-        cp -pvf ${temp} ${imx6ull_release_path} # 编译完自动拷贝一份到备份目录
-    done
-    get_end_time
-    get_execute_time
+    cd ${SCRIPT_ABSOLUTE_PATH}
+    cp -af rootfs/${buildroot_version}/configs/* ${buildroot_project_path}/configs
+    cd ${buildroot_project_path}
+    make ${buildroot_board_cfg}
+    make 
 }
-
-function update_uboot_img()
-{
-    cd ${uboot_project_path}
-    echo -e ${PINK}"current path:$(pwd)"${CLS}
-
-    for temp in ${uboot_img_name[@]}
-    do
-        if [ ! -f "${temp}" ];then
-            echo -e "${ERR}${temp} 不存在..."
-            continue
-        else
-            cp -pvf ${temp} ${imx6ull_release_path} # 编译完自动拷贝一份到备份目录
-        fi
-    done
-}
-
 
 function update_buildroot_rootfs()
 {
@@ -283,40 +180,55 @@ function update_buildroot_rootfs()
         echo -e "${ERR}${buildroot_rootfs_name}不存在..."
         return
     else
-        cp -pvf ${buildroot_rootfs_name} ${imx6ull_release_path} # 编译完自动拷贝一份到备份目录
-        cd ${imx6ull_release_path}
         tar -jcf ${buildroot_rootfs_name}.bz2 ${buildroot_rootfs_name}
         rm -rf ${buildroot_rootfs_name}
     fi
-
+    mv ${buildroot_rootfs_name}.bz2 ${SCRIPT_ABSOLUTE_PATH}
 }
+
+function get_buildroot_src()
+{
+    chmod 777 get_rootfs_src.sh
+    source ./get_rootfs_src.sh https://buildroot.org/downloads/${buildroot_version}.tar.gz
+}
+
 function echo_menu()
 {
     echo "================================================="
 	echo -e "${GREEN}               build project ${CLS}"
 	echo -e "${GREEN}                by @苏木    ${CLS}"
 	echo "================================================="
-    echo -e "${PINK}current path         :$(pwd)${CLS}"
-    echo -e "${PINK}SCRIPT_CURRENT_PATH  :${SCRIPT_CURRENT_PATH}${CLS}"
-    echo -e "${PINK}ARCH_NAME            :${ARCH_NAME}${CLS}"
-    echo -e "${PINK}CROSS_COMPILE_NAME   :${CROSS_COMPILE_NAME}${CLS}"
+    echo -e "${PINK}current path           :$(pwd)${CLS}"
+    echo -e "${PINK}SCRIPT_CURRENT_PATH    :${SCRIPT_CURRENT_PATH}${CLS}"
+    echo -e "${PINK}ARCH_NAME              :${ARCH_NAME}${CLS}"
+    echo -e "${PINK}CROSS_COMPILE_NAME     :${CROSS_COMPILE_NAME}${CLS}"
+    echo -e "${PINK}buildroot_project_path :${buildroot_project_path}${CLS}"
+    echo -e "${PINK}buildroot_board_cfg    :${buildroot_board_cfg}${CLS}"
     echo ""
-    echo -e "* [0] 编译linux kernel"
-    echo -e "* [1] 同步linux内核文件的修改"
-    echo -e "* [2] 同步uboot成果物"
-    echo -e "* [3] 同步buildroot成果物"
+    echo -e "* [0] 制作根文件系统"
     echo "================================================="
 }
 
 function func_process()
 {
+    if [ ${githubaction_ena} == '0' ];then
 	read -p "请选择功能,默认选择0:" choose
+    else
+    source_env_info
+    choose=0
+    fi
+
 	case "${choose}" in
-		"0") build_linux_project ${linux_board_cfg};;
-		"1") record_kernel_file_update;;
-		"2") update_uboot_img;;
-		"3") update_buildroot_rootfs;;
-		*) build_linux_project ${linux_board_cfg};;
+		"0")
+            get_buildroot_src
+            githubaction_build_rootfs
+            update_buildroot_rootfs
+            ;;
+		*) 
+            get_buildroot_src
+            githubaction_build_rootfs
+            update_buildroot_rootfs
+            ;;
 	esac
 }
 
