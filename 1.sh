@@ -168,11 +168,12 @@ function githubaction_build_rootfs()
     cp -af rootfs/${buildroot_version}/configs/* ${buildroot_project_path}/configs
     cd ${buildroot_project_path}
     make ${buildroot_board_cfg}
-    make 
+    make > make.log
 }
 
 function update_buildroot_rootfs()
 {
+    cd ${SCRIPT_ABSOLUTE_PATH}
     cd ${buildroot_project_path}/${buildroot_out_path}
     echo -e ${PINK}"current path:$(pwd)"${CLS}
 
@@ -180,10 +181,13 @@ function update_buildroot_rootfs()
         echo -e "${ERR}${buildroot_rootfs_name}不存在..."
         return
     else
-        tar -jcf ${buildroot_rootfs_name}.bz2 ${buildroot_rootfs_name}
-        rm -rf ${buildroot_rootfs_name}
+        echo -e "${INFO}${buildroot_rootfs_name}已生成..."
+        mkdir imx6ull_rootfs
+        tar xf ${buildroot_rootfs_name} -C imx6ull_rootfs
+        ls imx6ull_rootfs -alh
+        cp -af ${SCRIPT_ABSOLUTE_PATH}/rootfs/root_fs/etc/profile imx6ull_rootfs/etc/profile
+        tar -jcf imx6ull_rootfs.tar.bz2 imx6ull_rootfs
     fi
-    mv ${buildroot_rootfs_name}.bz2 ${SCRIPT_ABSOLUTE_PATH}
 }
 
 function get_buildroot_src()
