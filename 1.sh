@@ -189,7 +189,7 @@ function update_buildroot_rootfs()
     echo -e "rootfs.tar 已生成..."
     mkdir -p imx6ull_rootfs
     tar xf rootfs.tar -C imx6ull_rootfs
-    ls imx6ull_rootfs -alh
+    # ls imx6ull_rootfs -alh
     echo -e "开始拷贝自定义根文件系统相关文件..."
     cp -avf ${SCRIPT_ABSOLUTE_PATH}/rootfs_custom/* imx6ull_rootfs/
     echo -e "重新打包文件..."
@@ -209,8 +209,8 @@ function update_buildroot_rootfs()
 
     # 验证压缩结果
     if [ -f "${output_file}" ]; then
-        echo "打包成功！文件结构验证："
-        tar -tjf "${output_file}"
+        # echo "打包成功！文件结构验证："
+        # tar -tjf "${output_file}"
         echo -e "\n生成文件:"
         ls -lh "${output_file}"
     else
