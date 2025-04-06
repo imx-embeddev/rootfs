@@ -25,6 +25,7 @@ ERR="${RED}[ERR ]${CLS}"
 SCRIPT_NAME=${0#*/}
 SCRIPT_CURRENT_PATH=${0%/*}
 SCRIPT_ABSOLUTE_PATH=`cd $(dirname ${0}); pwd`
+PROJECT_ROOT=${SCRIPT_ABSOLUTE_PATH} # 工程的源码目录，一定要和编译脚本是同一个目录
 
 SYSTEM_ENVIRONMENT_FILE=/etc/profile # 系统环境变量位置
 USER_ENVIRONMENT_FILE=~/.bashrc
@@ -106,22 +107,22 @@ function dev_env_info()
 #===============================================
 # buildroot相关
 buildroot_version=buildroot-2023.05.1
-buildroot_project_path=./${buildroot_version}
-buildroot_out_path=output/images
-buildroot_rootfs_name=rootfs.tar
+buildroot_project_path=${PROJECT_ROOT}/${buildroot_version}
 
-githubaction_ena=0 # 手动选择功能
 DEF_CONFIG_TYPE=alpha # nxp 表示编译nxp官方原版配置文件，alpha表示编译我们自定义的配置文件
 buildroot_board_cfg=imx6ullalpha_defconfig
+
+COMPILE_PLATFORM=local # local：非githubaction自动打包，githubaction：githubaction自动打包
+
 # 脚本运行参数处理
 echo "There are $# parameters: $@"
-while getopts "g:t:" arg #选项后面的冒号表示该选项需要参数
+while getopts "p:t:" arg #选项后面的冒号表示该选项需要参数
     do
         case ${arg} in
-            g)
+            p)
                 # echo "a's arg:$OPTARG"     # 参数存在$OPTARG中
                 if [ $OPTARG == "1" ];then # 使用NXP官方的默认配置文件
-                    githubaction_ena=1
+                    COMPILE_PLATFORM=githubaction
                     buildroot_board_cfg=imx6ullalpha_githubaction_defconfig
                 fi
                 ;;
@@ -162,39 +163,79 @@ function source_env_info()
 
 }
 
-function githubaction_build_rootfs()
-{
-    cd ${SCRIPT_ABSOLUTE_PATH}
-    cp -af rootfs/${buildroot_version}/configs/* ${buildroot_project_path}/configs
-    cd ${buildroot_project_path}
-    make ${buildroot_board_cfg}
-    make > make.log
-}
-
 function update_buildroot_rootfs()
 {
-    cd ${SCRIPT_ABSOLUTE_PATH}
-    cd ${buildroot_project_path}/${buildroot_out_path}
-    echo -e ${PINK}"current path:$(pwd)"${CLS}
+    cd ${PROJECT_ROOT}
+    echo -e "${PINK}current path         :$(pwd)"${CLS}
+    echo -e "${PINK}buildroot_board_cfg  :${buildroot_board_cfg}${CLS}"
+    ls -alh
 
-    if [ ! -f "${buildroot_rootfs_name}" ];then
-        echo -e "${ERR}${buildroot_rootfs_name}不存在..."
+    # 进入buildroot源码目录的输出文件夹 buildroot-2023.05.1/output/images
+    if [ ! -d "${buildroot_project_path}/output/images" ];then
+        echo "${buildroot_project_path}/output/images not exit!"
         return
+    fi
+    
+    cd ${buildroot_project_path}/output/images
+    echo -e ${PINK}"current path        :$(pwd)"${CLS}
+    echo -e "${PINK}buildroot_board_cfg :${buildroot_board_cfg}${CLS}"
+
+    if [ ! -f "rootfs.tar" ];then
+        echo -e "rootfs.tar 不存在..."
+        return
+    fi
+
+    # 修改后重新打包
+    echo -e "rootfs.tar 已生成..."
+    mkdir -p imx6ull_rootfs
+    tar xf rootfs.tar -C imx6ull_rootfs
+    ls imx6ull_rootfs -alh
+    echo -e "开始拷贝自定义根文件系统相关文件..."
+    cp -avf ${SCRIPT_ABSOLUTE_PATH}/rootfs/root_fs/* imx6ull_rootfs/
+    echo -e "重新打包文件..."
+    # 生成时间戳（格式：年月日时分秒）
+    timestamp=$(date +%Y%m%d%H%M%S)
+    output_file="imx6ull_rootfs_${timestamp}.tar.bz2"
+    tar -jcf ${output_file} imx6ull_rootfs
+
+    # 验证压缩结果
+    if [ -f "${output_file}" ]; then
+        echo "打包成功！文件结构验证："
+        tar -tjf "${output_file}"
+        echo -e "\n生成文件："
+        ls -lh "${output_file}"
     else
-        echo -e "${INFO}${buildroot_rootfs_name}已生成..."
-        mkdir imx6ull_rootfs
-        tar xf ${buildroot_rootfs_name} -C imx6ull_rootfs
-        ls imx6ull_rootfs -alh
-        cp -af ${SCRIPT_ABSOLUTE_PATH}/rootfs/root_fs/etc/profile imx6ull_rootfs/etc/profile
-        tar -jcf imx6ull_rootfs.tar.bz2 imx6ull_rootfs
+        echo "文件打包失败!"
     fi
 }
 
 function get_buildroot_src()
 {
+    cd ${PROJECT_ROOT}
+    echo -e ${PINK}"current path        :$(pwd)"${CLS}
+    echo -e "${PINK}buildroot_board_cfg :${buildroot_board_cfg}${CLS}"
+
     chmod 777 get_rootfs_src.sh
     source ./get_rootfs_src.sh https://buildroot.org/downloads/${buildroot_version}.tar.gz
 }
+
+function githubaction_build_rootfs()
+{
+    cd ${PROJECT_ROOT}
+    echo -e "${PINK}current path         :$(pwd)"${CLS}
+    echo -e "${PINK}buildroot_board_cfg  :${buildroot_board_cfg}${CLS}"
+
+    source_env_info
+    echo "正在拷贝buildroot默认配置文件..."
+    cp -avf rootfs/${buildroot_version}/configs/* ${buildroot_project_path}/configs
+    cd ${buildroot_project_path}
+    echo "开始编译buildroot..."
+    make ${buildroot_board_cfg}
+    make > make.log
+    echo "编译完毕!"
+    echo "📁 日志文件: $(realpath make.log)"
+}
+
 
 function echo_menu()
 {
@@ -215,13 +256,11 @@ function echo_menu()
 
 function func_process()
 {
-    if [ ${githubaction_ena} == '0' ];then
-	read -p "请选择功能,默认选择0:" choose
-    else
-    source_env_info
+    if [ ${COMPILE_PLATFORM} == 'githubaction' ];then
     choose=0
+    else
+    read -p "请选择功能,默认选择0:" choose
     fi
-
 	case "${choose}" in
 		"0")
             get_buildroot_src
