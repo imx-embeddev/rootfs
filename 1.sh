@@ -196,7 +196,8 @@ function update_buildroot_rootfs()
     # 生成时间戳（格式：年月日时分秒）
     timestamp=$(date +%Y%m%d%H%M%S)
 
-    parent_dir=$(dirname "$(realpath "${SCRIPT_ABSOLUTE_PATH}")")
+    #parent_dir=$(dirname "$(realpath "${SCRIPT_ABSOLUTE_PATH}")") # 这个是获取的上一级目录的
+    parent_dir=$(realpath "${SCRIPT_ABSOLUTE_PATH}")
     # 判断是否是 Git 仓库并获取版本号
     if git -C "$parent_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
         version=$(git -C "$parent_dir" rev-parse --short HEAD)
