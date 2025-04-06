@@ -1,0 +1,6 @@
+buildroot-*
+buildroot-*.tar.*
+
+!rootfs_src_backup
+!rootfs_src_backup/*
+!rootfs_src_backup/buildroot*

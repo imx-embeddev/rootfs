@@ -110,7 +110,7 @@ buildroot_version=buildroot-2023.05.1
 buildroot_project_path=${PROJECT_ROOT}/${buildroot_version}
 
 DEF_CONFIG_TYPE=alpha # nxp 表示编译nxp官方原版配置文件，alpha表示编译我们自定义的配置文件
-buildroot_board_cfg=imx6ullalpha_defconfig
+buildroot_board_cfg=imx6ullalpha_local_defconfig
 
 COMPILE_PLATFORM=local # local：非githubaction自动打包，githubaction：githubaction自动打包
 
@@ -172,7 +172,7 @@ function update_buildroot_rootfs()
 
     # 进入buildroot源码目录的输出文件夹 buildroot-2023.05.1/output/images
     if [ ! -d "${buildroot_project_path}/output/images" ];then
-        echo "${buildroot_project_path}/output/images not exit!"
+        echo -e ${ERR}"${buildroot_project_path}/output/images not exit!"
         return
     fi
 
@@ -181,23 +181,26 @@ function update_buildroot_rootfs()
     echo -e "${PINK}buildroot_board_cfg :${buildroot_board_cfg}${CLS}"
 
     if [ ! -f "rootfs.tar" ];then
-        echo -e "rootfs.tar 不存在..."
+        echo -e ${ERR}"rootfs.tar 不存在..."
         return
     fi
 
     # 修改后重新打包
-    echo -e "rootfs.tar 已生成..."
+    echo -e ${INFO}"rootfs.tar 已生成..."
     mkdir -p imx6ull_rootfs
     tar xf rootfs.tar -C imx6ull_rootfs
     # ls imx6ull_rootfs -alh
-    echo -e "开始拷贝自定义根文件系统相关文件..."
-    cp -avf ${SCRIPT_ABSOLUTE_PATH}/rootfs_custom/* imx6ull_rootfs/
-    echo -e "重新打包文件..."
+    echo -e ${INFO}"开始拷贝自定义根文件系统相关文件..."
+    cp -avf ${PROJECT_ROOT}/rootfs_custom/* imx6ull_rootfs/
+
+    echo -e ${INFO}"开始拷贝编译时的日志文件..."
+    cp -avf ${buildroot_project_path}/make.log .
+
+    echo -e ${INFO}"重新打包文件..."
     # 生成时间戳（格式：年月日时分秒）
     timestamp=$(date +%Y%m%d%H%M%S)
-
-    #parent_dir=$(dirname "$(realpath "${SCRIPT_ABSOLUTE_PATH}")") # 这个是获取的上一级目录的
-    parent_dir=$(realpath "${SCRIPT_ABSOLUTE_PATH}")
+    #parent_dir=$(dirname "$(realpath "${PROJECT_ROOT}")") # 这个是获取的上一级目录的
+    parent_dir=$(realpath "${PROJECT_ROOT}")
     # 判断是否是 Git 仓库并获取版本号
     if git -C "$parent_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
         version=$(git -C "$parent_dir" rev-parse --short HEAD)
@@ -205,27 +208,75 @@ function update_buildroot_rootfs()
         version="unknown"
     fi
     output_file="rootfs-${timestamp}-${version}.tar.bz2"
-    tar -jcf ${output_file} imx6ull_rootfs
+    echo "rootfs-${timestamp}-${version}" > imx6ull_rootfs/version.txt
+    tar -jcf ${output_file} imx6ull_rootfs make.log
 
     # 验证压缩结果
     if [ -f "${output_file}" ]; then
         # echo "打包成功！文件结构验证："
         # tar -tjf "${output_file}"
-        echo -e "\n生成文件:"
+        echo -e ${INFO}"生成的压缩文件:"
         ls -lh "${output_file}"
     else
-        echo "文件打包失败!"
+        echo ${ERR}"文件打包失败!"
     fi
 }
 
 function get_buildroot_src()
 {
     cd ${PROJECT_ROOT}
-    echo -e ${PINK}"current path        :$(pwd)"${CLS}
+    echo -e "${PINK}current path        :$(pwd)"${CLS}
     echo -e "${PINK}buildroot_board_cfg :${buildroot_board_cfg}${CLS}"
 
     chmod 777 get_rootfs_src.sh
     source ./get_rootfs_src.sh https://buildroot.org/downloads/${buildroot_version}.tar.gz
+}
+
+function local_build_rootfs()
+{
+    cd ${PROJECT_ROOT}
+    echo -e "${PINK}current path         :$(pwd)"${CLS}
+    echo -e "${PINK}buildroot_board_cfg  :${buildroot_board_cfg}${CLS}"
+    get_start_time
+    # 1. 拷贝默认配置文件，用于配置buildroot
+    echo -e ${INFO}"正在拷贝buildroot默认配置文件..."
+    cp -avf rootfs_src_backup/${buildroot_version}/configs/* ${buildroot_project_path}/configs
+    echo -e ${INFO}"正在拷贝buildroot dl目录文件..."
+    cp -avf rootfs_src_backup/${buildroot_version}/dl ${buildroot_project_path}
+    
+    # 2. 开始编译buildroot
+    cd ${buildroot_project_path}
+    echo -e ${INFO}"开始编译buildroot(首次编译大概需要4分钟)..."
+    echo -e "${PINK}current path         :$(pwd)"${CLS}
+    echo -e "${PINK}buildroot_board_cfg  :${buildroot_board_cfg}${CLS}"
+    make ${buildroot_board_cfg}
+    make
+    echo ${WARN}"编译完成,但是busybox不支持中文,后面会拷贝对应的支持文件重新编译..."
+    get_end_time
+    get_execute_time
+
+    # 3.修改busybox源码后重新编译
+    get_start_time
+    cd ${PROJECT_ROOT}
+    echo -e ${INFO}"正在拷贝buildroot中busybox相关配置文件..."
+    echo -e "${PINK}current path         :$(pwd)"${CLS}
+    echo -e "${PINK}buildroot_board_cfg  :${buildroot_board_cfg}${CLS}"
+    cp -avf rootfs_src_backup/${buildroot_version}/output/* ${buildroot_project_path}/output
+    
+    cd ${buildroot_project_path}
+    echo -e ${INFO}"修改相关插件源码后重新开始编译buildroot(第二次编译会快一点)..."
+    echo -e "${PINK}current path         :$(pwd)"${CLS}
+    echo -e "${PINK}buildroot_board_cfg  :${buildroot_board_cfg}${CLS}"
+
+    # 下面这个命令相当于cp -f output/build/busybox-1.36.1/.config package/busybox/busybox.config
+    make busybox-update-config     # 更新 Buildroot 的 BusyBox 配置缓存,
+    make busybox-clean-for-rebuild # 这里不要好像也可以，但是为避免出现问题，还是清理一下
+    make busybox                   # 这里不要好像也可以，但是为避免出现问题，还是清理一下
+    make
+
+    get_end_time
+    get_execute_time
+    echo -e ${INFO}"✅ 根文件系统编译完毕。"
 }
 
 function githubaction_build_rootfs()
@@ -233,16 +284,27 @@ function githubaction_build_rootfs()
     cd ${PROJECT_ROOT}
     echo -e "${PINK}current path         :$(pwd)"${CLS}
     echo -e "${PINK}buildroot_board_cfg  :${buildroot_board_cfg}${CLS}"
-
+    get_start_time
     source_env_info
-    echo "正在拷贝buildroot默认配置文件..."
+    # 1. 拷贝默认配置文件，用于配置buildroot
+    echo -e ${INFO}"正在拷贝buildroot默认配置文件..."
     cp -avf rootfs_src_backup/${buildroot_version}/configs/* ${buildroot_project_path}/configs
+    
+    # 2. 开始编译buildroot
     cd ${buildroot_project_path}
-    echo "开始编译buildroot..."
-    make ${buildroot_board_cfg} > make.log
-    make >> make.log
-    echo "编译完毕!"
-    echo "📁 日志文件: $(realpath make.log)"
+    echo -e ${INFO}"开始编译buildroot(首次编译大概需要4分钟)..."
+    echo -e "${PINK}current path         :$(pwd)"${CLS}
+    echo -e "${PINK}buildroot_board_cfg  :${buildroot_board_cfg}${CLS}"
+    make ${buildroot_board_cfg} > make.log 2>&1
+    make >> make.log 2>&1
+    echo ${WARN}"编译完成,但是busybox不支持中文..."
+    echo ${WARN}"说明:关于中文，需要buildroot支持wqy-zenhei字体，但是这个字体很大，感觉得不偿失，至少目前还不需要中文，后面再说..."
+
+    echo -e ${INFO}"📁 日志文件: $(realpath make.log)"
+
+    get_end_time
+    get_execute_time
+    echo -e ${INFO}"✅ 根文件系统编译完毕。"
 }
 
 function echo_menu()
@@ -258,7 +320,8 @@ function echo_menu()
     echo -e "${PINK}buildroot_project_path :${buildroot_project_path}${CLS}"
     echo -e "${PINK}buildroot_board_cfg    :${buildroot_board_cfg}${CLS}"
     echo ""
-    echo -e "* [0] 制作根文件系统"
+    echo -e "* [0] githubaction制作根文件系统"
+    echo -e "* [1] local制作根文件系统"
     echo "================================================="
 }
 
@@ -275,9 +338,14 @@ function func_process()
             githubaction_build_rootfs
             update_buildroot_rootfs
             ;;
+        "1")
+            get_buildroot_src
+            local_build_rootfs
+            update_buildroot_rootfs
+            ;;
 		*) 
             get_buildroot_src
-            githubaction_build_rootfs
+            local_build_rootfs
             update_buildroot_rootfs
             ;;
 	esac
