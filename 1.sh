@@ -175,7 +175,7 @@ function update_buildroot_rootfs()
         echo "${buildroot_project_path}/output/images not exit!"
         return
     fi
-    
+
     cd ${buildroot_project_path}/output/images
     echo -e ${PINK}"current path        :$(pwd)"${CLS}
     echo -e "${PINK}buildroot_board_cfg :${buildroot_board_cfg}${CLS}"
@@ -191,18 +191,26 @@ function update_buildroot_rootfs()
     tar xf rootfs.tar -C imx6ull_rootfs
     ls imx6ull_rootfs -alh
     echo -e "开始拷贝自定义根文件系统相关文件..."
-    cp -avf ${SCRIPT_ABSOLUTE_PATH}/rootfs/root_fs/* imx6ull_rootfs/
+    cp -avf ${SCRIPT_ABSOLUTE_PATH}/rootfs_custom/* imx6ull_rootfs/
     echo -e "重新打包文件..."
     # 生成时间戳（格式：年月日时分秒）
     timestamp=$(date +%Y%m%d%H%M%S)
-    output_file="imx6ull_rootfs_${timestamp}.tar.bz2"
+
+    parent_dir=$(dirname "$(realpath "${SCRIPT_ABSOLUTE_PATH}")")
+    # 判断是否是 Git 仓库并获取版本号
+    if git -C "$parent_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        version=$(git -C "$parent_dir" rev-parse --short HEAD)
+    else
+        version="unknown"
+    fi
+    output_file="rootfs-${timestamp}-${version}.tar.bz2"
     tar -jcf ${output_file} imx6ull_rootfs
 
     # 验证压缩结果
     if [ -f "${output_file}" ]; then
         echo "打包成功！文件结构验证："
         tar -tjf "${output_file}"
-        echo -e "\n生成文件："
+        echo -e "\n生成文件:"
         ls -lh "${output_file}"
     else
         echo "文件打包失败!"
@@ -227,15 +235,14 @@ function githubaction_build_rootfs()
 
     source_env_info
     echo "正在拷贝buildroot默认配置文件..."
-    cp -avf rootfs/${buildroot_version}/configs/* ${buildroot_project_path}/configs
+    cp -avf rootfs_src_backup/${buildroot_version}/configs/* ${buildroot_project_path}/configs
     cd ${buildroot_project_path}
     echo "开始编译buildroot..."
-    make ${buildroot_board_cfg}
-    make > make.log
+    make ${buildroot_board_cfg} > make.log
+    make >> make.log
     echo "编译完毕!"
     echo "📁 日志文件: $(realpath make.log)"
 }
-
 
 function echo_menu()
 {
