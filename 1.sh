@@ -251,31 +251,31 @@ function local_build_rootfs()
     echo -e "${PINK}buildroot_board_cfg  :${buildroot_board_cfg}${CLS}"
     make ${buildroot_board_cfg}
     make
-    echo ${WARN}"编译完成,但是busybox不支持中文,后面会拷贝对应的支持文件重新编译..."
+    echo ${WARN}"编译完成,但是busybox不支持中文..."
     get_end_time
     get_execute_time
 
-    # 3.修改busybox源码后重新编译
-    get_start_time
-    cd ${PROJECT_ROOT}
-    echo -e ${INFO}"正在拷贝buildroot中busybox相关配置文件..."
-    echo -e "${PINK}current path         :$(pwd)"${CLS}
-    echo -e "${PINK}buildroot_board_cfg  :${buildroot_board_cfg}${CLS}"
-    cp -avf rootfs_src_backup/${buildroot_version}/output/* ${buildroot_project_path}/output
+    # # 3.修改busybox源码后重新编译
+    # get_start_time
+    # cd ${PROJECT_ROOT}
+    # echo -e ${INFO}"正在拷贝buildroot中busybox相关配置文件..."
+    # echo -e "${PINK}current path         :$(pwd)"${CLS}
+    # echo -e "${PINK}buildroot_board_cfg  :${buildroot_board_cfg}${CLS}"
+    # cp -avf rootfs_src_backup/${buildroot_version}/output/* ${buildroot_project_path}/output
     
-    cd ${buildroot_project_path}
-    echo -e ${INFO}"修改相关插件源码后重新开始编译buildroot(第二次编译会快一点)..."
-    echo -e "${PINK}current path         :$(pwd)"${CLS}
-    echo -e "${PINK}buildroot_board_cfg  :${buildroot_board_cfg}${CLS}"
+    # cd ${buildroot_project_path}
+    # echo -e ${INFO}"修改相关插件源码后重新开始编译buildroot(第二次编译会快一点)..."
+    # echo -e "${PINK}current path         :$(pwd)"${CLS}
+    # echo -e "${PINK}buildroot_board_cfg  :${buildroot_board_cfg}${CLS}"
 
-    # 下面这个命令相当于cp -f output/build/busybox-1.36.1/.config package/busybox/busybox.config
-    make busybox-update-config     # 更新 Buildroot 的 BusyBox 配置缓存,
-    make busybox-clean-for-rebuild # 这里不要好像也可以，但是为避免出现问题，还是清理一下
-    make busybox                   # 这里不要好像也可以，但是为避免出现问题，还是清理一下
-    make
+    # # 下面这个命令相当于cp -f output/build/busybox-1.36.1/.config package/busybox/busybox.config
+    # make busybox-update-config     # 更新 Buildroot 的 BusyBox 配置缓存,
+    # make busybox-clean-for-rebuild # 这里不要好像也可以，但是为避免出现问题，还是清理一下
+    # make busybox                   # 这里不要好像也可以，但是为避免出现问题，还是清理一下
+    # make
 
-    get_end_time
-    get_execute_time
+    # get_end_time
+    # get_execute_time
     echo -e ${INFO}"✅ 根文件系统编译完毕。"
 }
 
@@ -297,8 +297,8 @@ function githubaction_build_rootfs()
     echo -e "${PINK}buildroot_board_cfg  :${buildroot_board_cfg}${CLS}"
     make ${buildroot_board_cfg} > make.log 2>&1
     make >> make.log 2>&1
-    echo ${WARN}"编译完成,但是busybox不支持中文..."
-    echo ${WARN}"说明:关于中文，需要buildroot支持wqy-zenhei字体，但是这个字体很大，感觉得不偿失，至少目前还不需要中文，后面再说..."
+    echo -e ${WARN}"编译完成,但是busybox不支持中文..."
+    echo -e ${WARN}"说明:关于中文，需要buildroot支持wqy-zenhei字体，但是这个字体很大，感觉得不偿失，至少目前还不需要中文，后面再说..."
 
     echo -e ${INFO}"📁 日志文件: $(realpath make.log)"
 
