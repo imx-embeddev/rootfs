@@ -24,14 +24,13 @@ ERR="${RED}[ERR ]${CLS}"
 SCRIPT_NAME=${0#*/}
 SCRIPT_CURRENT_PATH=${0%/*}
 SCRIPT_ABSOLUTE_PATH=`cd $(dirname ${0}); pwd`
-home=/home/sumu
 
 SYSTEM_ENVIRONMENT_FILE=/etc/profile # 系统环境变量位置
-USER_ENVIRONMENT_FILE=${home}/.bashrc
-SOFTWARE_DIR_PATH=${home}/2software        # 软件安装目录
+USER_ENVIRONMENT_FILE=${HOME}/.bashrc
+SOFTWARE_DIR_PATH=${HOME}/2software        # 软件安装目录
 ##======================================================
 
-imx6ull_release_path=${home}/7Linux/imx6ull-alpha-release/release
+imx6ull_release_path=${SCRIPT_ABSOLUTE_PATH}
 uboot_img_name=(u-boot-dtb.bin u-boot-dtb.imx)
 linux_img_name=zImage
 linux_dtb_name=imx6ull-alpha-emmc.dtb
@@ -40,7 +39,7 @@ buildroot_rootfs_name=rootfs.tar.bz2
 sd_device=/dev/sdc
 sd_part=()
 sd_node=()
-sd_mount_path_prefix=${home}/sdtmp/sd_
+sd_mount_path_prefix=${HOME}/sdtmp/sd_
 sd_mount_path=${sd_mount_path_prefix}${sd_node[0]} # ~/tmp/sd_sdc1
 sd_part_num=0
 
