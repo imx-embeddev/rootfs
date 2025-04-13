@@ -179,26 +179,25 @@ function update_buildroot_rootfs()
     cd ${buildroot_project_path}/output/images
     echo -e ${PINK}"current path        :$(pwd)"${CLS}
     echo -e "${PINK}buildroot_board_cfg :${buildroot_board_cfg}${CLS}"
-
+    # 检查根文件系统压缩包是否存在
     if [ ! -f "rootfs.tar" ];then
         echo -e ${ERR}"rootfs.tar 不存在..."
         return
     fi
-
-    # 修改后重新打包
     echo -e ${INFO}"rootfs.tar 已生成..."
     mkdir -p imx6ull_rootfs
     tar xf rootfs.tar -C imx6ull_rootfs
     # ls imx6ull_rootfs -alh
+
+    # 修改后重新打包
     echo -e ${INFO}"开始拷贝自定义根文件系统相关文件..."
     cp -avf ${PROJECT_ROOT}/rootfs_custom/* imx6ull_rootfs/
 
     echo -e ${INFO}"开始拷贝编译时的日志文件..."
-    cp -avf ${buildroot_project_path}/make.log .
+    cp -avf ${buildroot_project_path}/rootfs_make.log .
 
-    echo -e ${INFO}"重新打包文件..."
     # 生成时间戳（格式：年月日时分秒）
-    timestamp=$(date +%Y%m%d%H%M%S)
+    timestamp=$(LC_ALL=C date "+%b %d %Y %H:%M:%S %z") # $(date +%Y%m%d%H%M%S)
     #parent_dir=$(dirname "$(realpath "${PROJECT_ROOT}")") # 这个是获取的上一级目录的
     parent_dir=$(realpath "${PROJECT_ROOT}")
     # 判断是否是 Git 仓库并获取版本号
@@ -207,9 +206,18 @@ function update_buildroot_rootfs()
     else
         version="unknown"
     fi
-    output_file="rootfs-${timestamp}-${version}.tar.bz2"
-    echo "rootfs-${timestamp}-${version}" > imx6ull_rootfs/version.txt
-    tar -jcf ${output_file} imx6ull_rootfs make.log
+    echo "Buildrootfs: buildroot-2023.05.1" > imx6ull_rootfs/version.txt
+    echo "Build Time:${timestamp}" >> imx6ull_rootfs/version.txt
+    echo "Build User:$USER" >> imx6ull_rootfs/version.txt
+    echo "Git Commit:g${version}" >> imx6ull_rootfs/version.txt
+    # 之前的时间格式存在空格，我这里还需要作为文件名，所以转换一下
+    formatted_time=$(date -d "${timestamp}" "+%Y%m%d%H%M%S")
+    output_file="rootfs-${formatted_time}-${version}.tar.bz2"
+    echo "rootfs-${formatted_time}-${version}" >> imx6ull_rootfs/version.txt
+
+    # 打包文件
+    echo -e ${INFO}"重新打包文件..."
+    tar -jcf ${output_file} imx6ull_rootfs rootfs_make.log
 
     # 验证压缩结果
     if [ -f "${output_file}" ]; then
@@ -316,12 +324,12 @@ function githubaction_build_rootfs()
     echo -e ${INFO}"开始编译buildroot(首次编译大概需要4分钟)..."
     echo -e "${PINK}current path         :$(pwd)"${CLS}
     echo -e "${PINK}buildroot_board_cfg  :${buildroot_board_cfg}${CLS}"
-    make ${buildroot_board_cfg} > make.log 2>&1
-    make >> make.log 2>&1
+    make ${buildroot_board_cfg} > rootfs_make.log 2>&1
+    make >> rootfs_make.log 2>&1
     echo -e ${WARN}"编译完成,但是busybox不支持中文..."
     echo -e ${WARN}"说明:关于中文，需要buildroot支持wqy-zenhei字体，但是这个字体很大，感觉得不偿失，至少目前还不需要中文，后面再说..."
 
-    echo -e ${INFO}"📁 日志文件: $(realpath make.log)"
+    echo -e ${INFO}"📁 日志文件: $(realpath rootfs_make.log)"
 
     get_end_time
     get_execute_time
