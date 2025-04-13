@@ -24,10 +24,10 @@ ERR="${RED}[ERR ]${CLS}"
 SCRIPT_NAME=${0#*/}
 SCRIPT_CURRENT_PATH=${0%/*}
 SCRIPT_ABSOLUTE_PATH=`cd $(dirname ${0}); pwd`
-
+user_home=/home/sumu
 SYSTEM_ENVIRONMENT_FILE=/etc/profile # 系统环境变量位置
-USER_ENVIRONMENT_FILE=${HOME}/.bashrc
-SOFTWARE_DIR_PATH=${HOME}/2software        # 软件安装目录
+USER_ENVIRONMENT_FILE=${user_home}/.bashrc
+SOFTWARE_DIR_PATH=${user_home}/2software        # 软件安装目录
 ##======================================================
 
 imx6ull_release_path=${SCRIPT_ABSOLUTE_PATH}
@@ -39,7 +39,7 @@ buildroot_rootfs_name=rootfs.tar.bz2
 sd_device=/dev/sdc
 sd_part=()
 sd_node=()
-sd_mount_path_prefix=${HOME}/sdtmp/sd_
+sd_mount_path_prefix=${user_home}/sdtmp/sd_
 sd_mount_path=${sd_mount_path_prefix}${sd_node[0]} # ~/tmp/sd_sdc1
 sd_part_num=0
 
@@ -260,8 +260,10 @@ function sd_dowwnload_rootfs()
     cd ${sd_mount_path}
     ls  ${sd_mount_path} -a
     echo -e ${INFO}"开始解压 ${buildroot_rootfs_name} ..."
-    execute "tar jxf ${buildroot_rootfs_name}"
-    execute "tar xf ${buildroot_rootfs_name%.*}"
+    # 注意，这里需要把根文件系统直接解压到对应目录，
+    # 挂载的时候uboot的bootargs可以设置为root=/dev/mmcblk0p2，而不能设置为root=/dev/mmcblk0p2/imx6ull-rootfs
+    execute "tar jxf --strip-components=1 -C ${buildroot_rootfs_name}"
+    # execute "tar xf ${buildroot_rootfs_name%.*}"
     echo -e ${INFO}"${buildroot_rootfs_name} 解压完毕，目录中文件如下:"
     ls  ${sd_mount_path} -a
     sync
