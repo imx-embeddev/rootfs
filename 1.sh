@@ -279,13 +279,34 @@ function local_build_rootfs()
     echo -e ${INFO}"✅ 根文件系统编译完毕。"
 }
 
+function driver_modules_compile()
+{
+    cd ${PROJECT_ROOT}
+    echo -e "${PINK}current path         :$(pwd)"${CLS}
+    echo -e "${PINK}buildroot_board_cfg  :${buildroot_board_cfg}${CLS}"
+
+    # 1. clone 驱动仓库
+    git clone --depth=1 https://gitee.com/sumumm/imx6ull-driver-demo
+    if [ ! -d "imx6ull-driver-demo" ];then
+        echo -e "${ERR}""imx6ull-driver-demo目录不存在!"
+    fi
+
+    # 2. 进入指定的驱动目录
+    cd imx6ull-driver-demo/40_procfs_demo/02_driver_template
+    echo -e "${PINK}current path         :$(pwd)"${CLS}
+    make KERNELDIR="/home/runner/work/repo-linux-release/repo-linux-release/kernel_nxp_4.19.71"
+    # make KERNELDIR="/home/sumu/7Linux/imx6ull-kernel"
+    # 3. 打包成果物到对应目录
+    cp -avf drivers_demo/*.ko ${PROJECT_ROOT}/rootfs_custom/firmware/modules
+
+}
+
 function githubaction_build_rootfs()
 {
     cd ${PROJECT_ROOT}
     echo -e "${PINK}current path         :$(pwd)"${CLS}
     echo -e "${PINK}buildroot_board_cfg  :${buildroot_board_cfg}${CLS}"
     get_start_time
-    source_env_info
     # 1. 拷贝默认配置文件，用于配置buildroot
     echo -e ${INFO}"正在拷贝buildroot默认配置文件..."
     cp -avf rootfs_src_backup/${buildroot_version}/configs/* ${buildroot_project_path}/configs
@@ -335,6 +356,8 @@ function func_process()
 	case "${choose}" in
 		"0")
             get_buildroot_src
+            source_env_info
+            driver_modules_compile
             githubaction_build_rootfs
             update_buildroot_rootfs
             ;;
